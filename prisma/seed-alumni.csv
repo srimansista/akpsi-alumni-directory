@@ -1,0 +1,3 @@
+name,gradYear,company,role,email,linkedInUrl,major,location,industry,willingToMentor,willingToSpeak,notes
+Alex Johnson,2019,Deloitte,Consultant,alex.johnson@example.com,https://linkedin.com/in/alexjohnson,Information Systems,Washington DC,Consulting,true,false,Open to coffee chats
+Priya Shah,2021,Google,Product Analyst,priya.shah@example.com,https://linkedin.com/in/priyashah,Computer Science,New York NY,Technology,true,true,Happy to speak at panels
