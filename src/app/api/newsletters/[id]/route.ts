@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { newsletterSchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type Params = { params: { id: string } };
 

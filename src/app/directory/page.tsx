@@ -61,18 +61,18 @@ async function getAlumniFromCsv(): Promise<AlumnusRecord[]> {
   const now = new Date();
   const seen = new Set<string>();
 
-  return parsed.data
-    .map((row, idx) => {
+  const rows: AlumnusRecord[] = [];
+  parsed.data.forEach((row, idx) => {
       const fallbackName = `${toNullable(row.First) ?? ""} ${toNullable(row.Last) ?? ""}`.trim();
       const combinedName = toNullable(row.name) ?? (fallbackName || null);
       const email = toNullable(row.email ?? row.Email)?.toLowerCase() ?? null;
       const gradYearRaw = row.gradYear ?? row["Grad Year"];
       const gradYear = gradYearRaw ? Number(gradYearRaw) : null;
       const dedupeKey = email ?? `${combinedName ?? "unknown"}-${gradYear ?? "na"}`;
-      if (!combinedName || seen.has(dedupeKey)) return null;
+      if (!combinedName || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
 
-      return {
+      rows.push({
         id: email ?? `csv-${combinedName.toLowerCase().replace(/\s+/g, "-")}-${gradYear ?? "na"}-${idx}`,
         name: combinedName,
         gradYear: Number.isFinite(gradYear) ? gradYear : null,
@@ -90,9 +90,10 @@ async function getAlumniFromCsv(): Promise<AlumnusRecord[]> {
         unsubscribed: false,
         createdAt: now,
         updatedAt: now,
-      } satisfies AlumnusRecord;
-    })
-    .filter((row): row is AlumnusRecord => row !== null);
+      });
+    });
+
+  return rows;
 }
 
 async function getAlumni(): Promise<AlumnusRecord[]> {

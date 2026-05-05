@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { alumniSchema } from "@/lib/validations";
 
+export const runtime = "nodejs";
+
 interface Params {
   params: { id: string };
 }

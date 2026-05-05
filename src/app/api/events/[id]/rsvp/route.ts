@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { eventRsvpSchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type Params = { params: { id: string } };
 

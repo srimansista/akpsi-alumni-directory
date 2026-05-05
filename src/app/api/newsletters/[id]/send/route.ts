@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { sendNewsletterEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type Params = { params: { id: string } };
 
