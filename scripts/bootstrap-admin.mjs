@@ -6,7 +6,7 @@ try {
  const email=process.env.ADMIN_EMAIL?.trim().toLowerCase();
  const password=process.env.ADMIN_PASSWORD;
  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Set ADMIN_EMAIL to your own email address.');
- if(!password || password.length<12 || password.length>128) throw new Error('Set ADMIN_PASSWORD to a unique password of 12–128 characters before bootstrapping. It is stored only as a hash in PostgreSQL.');
+ if(!password || password.length<8 || password.length>128) throw new Error('Set ADMIN_PASSWORD to a unique password of 8–128 characters before bootstrapping. It is stored only as a hash in PostgreSQL.');
  const passwordHash=await hashPassword(password);
  const existingUser=await db.user.findUnique({where:{email}});
  const existingAlumni=existingUser?.alumniId ? await db.alumni.findUnique({where:{id:existingUser.alumniId}}) : await db.alumni.findFirst({where:{email:{equals:email,mode:"insensitive"}}});

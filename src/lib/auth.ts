@@ -14,7 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
    if (!parsed.success) return null;
    if (!await consumeAttempt("signin", parsed.data.email)) return null;
    const user = await prisma.user.findUnique({where:{email:parsed.data.email}});
-   if (!user || user.accessStatus !== "APPROVED" || !user.emailVerified || !await verifyPassword(parsed.data.password,user.passwordHash)) return null;
+   if (!user || user.accessStatus !== "APPROVED" || !await verifyPassword(parsed.data.password,user.passwordHash)) return null;
    return user;
   }}),
  ],
@@ -22,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   async signIn({user}) {
    if(!user.email) return false;
    const member = await prisma.user.findUnique({where:{email:user.email.trim().toLowerCase()}});
-   return member?.accessStatus === "APPROVED" && !!member.emailVerified;
+   return member?.accessStatus === "APPROVED";
   },
   async jwt({token,user}) {
    if(user) {

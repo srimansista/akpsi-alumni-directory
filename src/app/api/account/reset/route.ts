@@ -5,8 +5,8 @@ import { tokenSchema, tokenDigest } from "@/lib/account-token";
 import { consumeAttempt } from "@/lib/rate-limit";
 import { hashPassword } from "@/lib/password.mjs";
 export async function POST(req:NextRequest) {
- const parsed=tokenSchema.extend({password:z.string().min(12).max(128)}).safeParse(await req.json().catch(()=>null));
- if(!parsed.success) return NextResponse.json({error:"Use a valid reset link and a password of at least 12 characters."},{status:400});
+ const parsed=tokenSchema.extend({password:z.string().min(8).max(128)}).safeParse(await req.json().catch(()=>null));
+ if(!parsed.success) return NextResponse.json({error:"Use a valid reset link and a password of at least 8 characters."},{status:400});
  try {
   const {email,token,password}=parsed.data;const identifier=`reset:${email}`;const digest=tokenDigest(token);if(!await consumeAttempt("reset-token",email,10)) return NextResponse.json({error:"Too many attempts. Try later."},{status:429});
   const record=await prisma.verificationToken.findUnique({where:{identifier_token:{identifier,token:digest}}});

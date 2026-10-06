@@ -13,7 +13,7 @@ const temp=mkdtempSync(path.join(tmpdir(),'akpsi-access-test-'));
 const outbox=path.join(temp,'outbox.jsonl');
 const url=new URL(process.env.DATABASE_URL);url.searchParams.set('schema',schema);
 const origin='http://localhost:3011';
-const env={...process.env,DATABASE_URL:url.toString(),AUTH_URL:origin,AUTH_SECRET:randomBytes(48).toString('base64'),RESEND_API_KEY:'test-key',EMAIL_FROM:'test@example.test',SUBMISSION_APPROVAL_EMAIL:'reviewer@example.test',AKPSI_TEST_OUTBOX:outbox,NODE_OPTIONS:`--import ${pathToFileURL(path.resolve('tests/email-mock.mjs')).href}`,NODE_ENV:'production'};
+const env={...process.env,DATABASE_URL:url.toString(),AUTH_URL:origin,AUTH_SECRET:randomBytes(48).toString('base64'),RESEND_API_KEY:'',EMAIL_FROM:'',SUBMISSION_APPROVAL_EMAIL:'reviewer@example.test',AKPSI_TEST_OUTBOX:outbox,NODE_OPTIONS:`--import ${pathToFileURL(path.resolve('tests/email-mock.mjs')).href}`,NODE_ENV:'production'};
 const migrate=spawnSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy'],{env,encoding:'utf8'});
 if(migrate.status!==0)throw new Error(`Integration migrations failed: ${migrate.stderr}`);
 const db=new PrismaClient({datasources:{db:{url:url.toString()}}});
@@ -24,7 +24,7 @@ async function stop(){if(server && server.exitCode===null){const exited=new Prom
 function client(){const cookies=new Map();return {async request(path,options={}){const res=await fetch(origin+path,{redirect:'manual',...options,headers:{cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; '),origin,...options.headers}});for(const c of res.headers.getSetCookie()){const pair=c.split(';')[0];const i=pair.indexOf('=');cookies.set(pair.slice(0,i),pair.slice(i+1));}return res;},async login(email,password){const csrf=await (await this.request('/api/auth/csrf')).json();await this.request('/api/auth/callback/credentials',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Auth-Return-Redirect':'1'},body:new URLSearchParams({csrfToken:csrf.csrfToken,email,password,callbackUrl:`${origin}/directory`})});return (await this.request('/api/auth/session')).json();}};}
 const json=(body,method='POST')=>({method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 try {
- const password='integration-only-password-2026';const passwordHash=await hashPassword(password);
+ const password='testpass';const passwordHash=await hashPassword(password);
  const record=await db.alumni.create({data:{name:'Integration Brother',email:'member@example.test',company:'Original Company'}});
  const admin=await db.user.create({data:{name:'Test Admin',email:'admin@example.test',role:'ADMIN',accessStatus:'APPROVED',emailVerified:new Date(),passwordHash}});
  const memberEmail='member@example.test';
@@ -42,22 +42,19 @@ try {
  assert.equal(protectedPage.status,307,'forged cookies cannot read directory');
  const protectedBody=await protectedPage.text();assert.equal(protectedBody.includes('Original Company'),false);
  console.log('PASS: private pages and APIs reject anonymous and forged sessions');
+ assert.equal((await anonymous.request('/api/access-request',json({name:'Integration Brother',email:memberEmail,password:'short'}))).status,400);
  assert.equal((await anonymous.request('/api/access-request',json({name:'Integration Brother',email:memberEmail,password}))).status,202);
+ assert.equal((await anonymous.request('/api/access-request',json({name:'Impersonator',email:memberEmail,password:'otherpass'}))).status,202,'duplicate request does not overwrite credentials');
  const member=await db.user.findUnique({where:{email:memberEmail}});
  assert.equal(member.accessStatus,'PENDING');assert.notEqual(member.passwordHash,password);
- const delivered=readFileSync(outbox,'utf8').trim().split('\n').map(line=>JSON.parse(line));
- const link=new URL(delivered[0].text.split('\n').find(line=>line.startsWith(origin)));
- assert.equal(link.pathname,'/auth/verify');
+ assert.equal(member.emailVerified,null,'registration does not pretend to verify email');
+ assert.equal(existsSync(outbox),false,'registration sends no email');
  assert.equal((await client().login(member.email,password))?.user,undefined,'pending cannot log in');
  const adminClient=client();assert.equal((await adminClient.login(admin.email,password)).user.role,'ADMIN');
  assert.equal((await adminClient.request(`/api/admin/members/${member.id}`,json({accessStatus:'APPROVED'},'PATCH'))).status,200);
- assert.equal((await client().login(member.email,password))?.user,undefined,'approved but unverified cannot log in');
- const token=link.searchParams.get('token');
- assert.equal((await anonymous.request('/api/account/verify',json({email:member.email,token}))).status,200);
- assert.equal((await anonymous.request('/api/account/verify',json({email:member.email,token}))).status,400,'verification links are single-use');
  const memberClient=client();const loggedIn=await memberClient.login(member.email,password);assert.equal(loggedIn.user.id,member.id);
  assert.equal(JSON.stringify(loggedIn).includes(passwordHash),false,'password hash never appears in session');
- console.log('PASS: both email verification and explicit admin approval are required');
+ console.log('PASS: registration needs no email service; explicit admin approval enables login');
  assert.equal((await memberClient.request('/api/admin/members')).status,403,'member cannot manage access');
  assert.equal((await memberClient.request(`/api/admin/members/${admin.id}`,json({accessStatus:'REJECTED'},'PATCH'))).status,403);
  assert.equal((await adminClient.request(`/api/admin/members/${admin.id}`,json({accessStatus:'REJECTED'},'PATCH'))).status,400,'cannot revoke own admin');
@@ -104,7 +101,7 @@ try {
  // Resetting passwords invalidates old sessions and consumes the link once.
  const resetToken=randomBytes(32).toString('hex');
  await db.verificationToken.create({data:{identifier:`reset:${admin.email}`,token:createHash('sha256').update(resetToken).digest('hex'),expires:new Date(Date.now()+60000)}});
- const newPassword='new-integration-password-2026';
+ const newPassword='newpass8';
  assert.equal((await anonymous.request('/api/account/reset',json({email:admin.email,token:resetToken,password:newPassword}))).status,200);
  assert.equal((await adminClient.request('/api/admin/members')).status,403);
  assert.equal((await client().login(admin.email,password))?.user,undefined);
