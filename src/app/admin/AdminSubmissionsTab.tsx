@@ -1,93 +1,11 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-interface Submission {
-  id: string;
-  name: string;
-  email: string | null;
-  company: string | null;
-  gradYear: number | null;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  createdAt: string;
-}
-
-export default function AdminSubmissionsTab() {
-  const [items, setItems] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  async function fetchItems() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/submissions");
-      if (res.ok) setItems(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function review(id: string, status: "APPROVED" | "REJECTED", applyToAlumni = false) {
-    await fetch(`/api/submissions/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, applyToAlumni }),
-    });
-    fetchItems();
-  }
-
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  return (
-    <Card className="shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-[#1e3a5f]">Pending Submissions ({items.length})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <p className="text-sm text-gray-500 text-center py-6">Loading submissions...</p>
-        ) : items.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-6">No pending submissions.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Grad Year</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell>{s.email ?? "—"}</TableCell>
-                    <TableCell>{s.company ?? "—"}</TableCell>
-                    <TableCell>{s.gradYear ?? "—"}</TableCell>
-                    <TableCell><Badge className="bg-amber-100 text-amber-700 border-amber-200">{s.status}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => review(s.id, "APPROVED", true)}>Approve & Apply</Button>
-                        <Button size="sm" variant="outline" onClick={() => review(s.id, "APPROVED")}>Approve</Button>
-                        <Button size="sm" variant="destructive" onClick={() => review(s.id, "REJECTED")}>Reject</Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+interface Submission {id:string;name:string;email:string|null;company:string|null;role:string|null;major:string|null;industry:string|null;location:string|null;gradYear:number|null;linkedInUrl:string|null;notes:string|null;willingToMentor:boolean;willingToSpeak:boolean;createdAt:string;}
+export default function AdminSubmissionsTab(){
+ const [items,setItems]=useState<Submission[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [busy,setBusy]=useState<string|null>(null);
+ async function load(){try{const res=await fetch("/api/submissions");if(!res.ok)throw new Error("Could not load profile updates.");setItems(await res.json());}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
+ useEffect(()=>{load();},[]);
+ async function review(id:string,status:"APPROVED"|"REJECTED"){setBusy(id);setError("");try{const res=await fetch(`/api/submissions/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status,applyToAlumni:status==="APPROVED"})});const result=await res.json();if(!res.ok)throw new Error(result.error);await load();}catch(e){setError((e as Error).message);}finally{setBusy(null);}}
+ return <section><div className="section-line"><h2>Profile changes to review</h2><span>{items.length} PENDING</span></div><p className="text-sm text-slate-500 mb-6">Approve to publish these details to the linked alumni profile. Account access is managed separately.</p>{error&&<p role="alert" className="form-error mb-4">{error}</p>}{loading?<p className="text-sm text-slate-500">Loading updates…</p>:items.length===0?<p className="text-sm text-slate-500">You’re caught up. No profile changes to review.</p>:<div className="space-y-5">{items.map(s=><article key={s.id} className="submission-review"><header><div><h3>{s.name}</h3><p>{s.email ?? "No email provided"}</p></div><div className="member-access-actions"><Button size="sm" disabled={busy===s.id} onClick={()=>review(s.id,"APPROVED")}>Approve changes</Button><Button size="sm" variant="outline" disabled={busy===s.id} onClick={()=>review(s.id,"REJECTED")}>Reject</Button></div></header><details><summary>Review submitted information</summary><dl>{[{label:"Name",value:s.name},{label:"Email",value:s.email},{label:"Class",value:s.gradYear},{label:"Company",value:s.company},{label:"Role",value:s.role},{label:"Education",value:s.major},{label:"Industry",value:s.industry},{label:"Location",value:s.location},{label:"LinkedIn",value:s.linkedInUrl},{label:"Mentoring",value:s.willingToMentor?"Available":"Not available"},{label:"Speaking",value:s.willingToSpeak?"Available":"Not available"},{label:"Notes",value:s.notes}].map(d=><div key={d.label}><dt>{d.label}</dt><dd>{d.value || "Not supplied"}</dd></div>)}</dl></details></article>)}</div>}</section>;
 }

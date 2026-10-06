@@ -8,7 +8,13 @@
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "node node_modules/next/dist/bin/next lint",
     "postinstall": "prisma generate",
-    "db:seed": "node prisma/seed.mjs"
+    "db:seed": "node prisma/seed.mjs",
+    "db:migrate": "prisma migrate deploy",
+    "db:admin": "node scripts/bootstrap-admin.mjs",
+    "build:vercel": "prisma generate && prisma migrate deploy && next build",
+    "test": "node --test tests/*.cjs tests/*.test.mjs",
+    "test:integration": "node tests/member-access.integration.mjs",
+    "preview": "node scripts/preview.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

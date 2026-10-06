@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isApproved } from "@/lib/access";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -19,12 +20,13 @@ const updateSubmissionSchema = z.object({
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const submission = await prisma.alumniUpdateSubmission.findUnique({
+    return await prisma.$transaction(async tx => {
+    const submission = await tx.alumniUpdateSubmission.findUnique({
       where: { id: params.id },
     });
 
@@ -44,6 +46,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { status, applyToAlumni, alumniId } = parsed.data;
     const reviewedBy = session.user?.email ?? session.user?.id ?? "admin";
 
+    const reserved = await tx.alumniUpdateSubmission.updateMany({where:{id:params.id,status:"PENDING"},data:{status,reviewedAt:new Date(),reviewedBy}});
+    if(reserved.count !== 1) return NextResponse.json({error:"This update has already been reviewed."},{status:409});
     // Perform alumni upsert if approved and requested
     let targetAlumniId: string | null = alumniId ?? submission.alumniId ?? null;
 
@@ -65,28 +69,28 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
       if (targetAlumniId) {
         // Update existing alumni
-        const exists = await prisma.alumni.findUnique({
+        const exists = await tx.alumni.findUnique({
           where: { id: targetAlumniId },
         });
         if (exists) {
-          await prisma.alumni.update({
+          await tx.alumni.update({
             where: { id: targetAlumniId },
             data: alumniData,
           });
         } else {
           // The referenced alumni no longer exists — create a new one
-          const created = await prisma.alumni.create({ data: alumniData });
+          const created = await tx.alumni.create({ data: alumniData });
           targetAlumniId = created.id;
         }
       } else {
         // No existing alumni linked — create one
-        const created = await prisma.alumni.create({ data: alumniData });
+        const created = await tx.alumni.create({ data: alumniData });
         targetAlumniId = created.id;
       }
     }
 
     // Update submission status
-    const updated = await prisma.alumniUpdateSubmission.update({
+    const updated = await tx.alumniUpdateSubmission.update({
       where: { id: params.id },
       data: {
         status,
@@ -97,6 +101,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     });
 
     return NextResponse.json(updated);
+    });
   } catch (err) {
     console.error("[PUT /api/submissions/[id]]", err);
     return NextResponse.json(

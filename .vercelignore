@@ -1,0 +1,9 @@
+data/
+.agents/
+skills-lock.json
+tests/
+scripts/
+src/features/
+.env*
+*.tsbuildinfo
+DEPLOYMENT.md

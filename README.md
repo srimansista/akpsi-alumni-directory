@@ -1,119 +1,43 @@
-# AKPsi Omega Theta Alumni Portal
+# AKPsi Omega Theta alumni portal
 
-A full-stack alumni portal for Alpha Kappa Psi Omega Theta at UMD, built with Next.js App Router, Prisma, PostgreSQL, NextAuth/Auth.js, Tailwind, and shadcn/ui.
+A private member directory built with Next.js, Auth.js, Prisma, and PostgreSQL. The root opens the directory; the shared navigation is at the top.
 
-## Features
+Members request an account, verify their email, and wait for administrator approval. Approved members can search alumni, privately save contacts as Want to talk or Talked to, view useful contact profiles. Administrators approve/revoke accounts and can review existing profile submissions. Revocation and password resets invalidate previous login sessions.
 
-- Landing page with mission, stats cards, CTAs, and "Why this matters" section
-- Alumni directory with search, filters, sort, favorites, responsive card layout
-- Alumni profile pages with contact/career details and mentorship flags
-- Public alumni update form with pending review workflow
-- Admin dashboard with:
-  - Alumni CRUD
-  - CSV import with preview/duplicate detection
-  - CSV export
-  - Data quality summary (missing/duplicate indicators)
-  - Submission approve/reject/apply actions
-  - Event CRUD + RSVP tracking
-  - Newsletter CRUD + send workflow + send status
-- Newsletter archive + detail pages
-- Unsubscribe flow for newsletter recipients
-- Role-based access (`ADMIN`, `VIEWER`) and configurable directory visibility
+Directory fields reflect job functions first, with labeled education fallbacks. Company names and employer industries do not determine the field. Original education and employment records are preserved. Existing favorites become Want to talk contacts.
 
-## Tech Stack
+All member data, approval decisions, profile submissions, favorites, password hashes, and email verification tokens are stored in PostgreSQL. The runtime never falls back to local CSV files. CSV files are used only for a repeatable roster import.
 
-- `next@14` + `typescript`
-- `tailwindcss` + `shadcn/ui`
-- `prisma` + PostgreSQL (Neon/Supabase/local Postgres)
-- `next-auth@5` (Auth.js) with Prisma adapter
-- `resend` for email sending
-- `zod` for validation
+## Run locally
 
-## Database Models
+Copy `.env.example` to `.env`, configure PostgreSQL and a random `AUTH_SECRET`, then:
 
-Defined in `prisma/schema.prisma`:
-
-- `User`
-- `Alumni`
-- `AlumniUpdateSubmission`
-- `Event`
-- `EventRSVP`
-- `Newsletter`
-- `NewsletterRecipient`
-- `Favorite`
-- `AuditLog`
-- NextAuth support models: `Account`, `Session`, `VerificationToken`
-
-## Environment Setup
-
-1. Copy `.env.example` to `.env`
-2. Fill required values:
-   - `DATABASE_URL`
-   - `AUTH_SECRET`
-   - `AUTH_URL`
-   - `ADMIN_EMAIL`
-   - `ADMIN_PASSWORD` (recommended)
-   - `RESEND_API_KEY`
-   - `EMAIL_FROM`
-   - `DIRECTORY_ACCESS` (`public` or `protected`)
-
-## Local Development
-
-```bash
+```sh
 npm install
-npx prisma migrate dev
-npx prisma generate
+npm run db:migrate
 npm run db:seed
+npm run db:admin
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+`db:admin` needs your own `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters. It bootstraps the first approved administrator. The password is hashed before storage; no default password exists. Remove the bootstrap password from the environment after creating the account.
 
-## CSV Import Format
+Registration, verification resends, and password recovery need `RESEND_API_KEY`, a verified `EMAIL_FROM`, and `AUTH_URL`. Pending profile submissions are always saved before attempting a notification to `SUBMISSION_APPROVAL_EMAIL`. Notification delivery failure does not lose the saved update.
 
-Admin CSV import expects headers like:
+## Checks
 
-`name, gradYear, company, role, email, linkedInUrl, major, location, industry, willingToMentor, willingToSpeak, notes`
-
-## Seed Data
-
-- Sample seed file: `prisma/seed-alumni.csv`
-- Seed command: `npm run db:seed`
-- Optional custom file path:
-
-```bash
-node prisma/seed.mjs ./path/to/your-alumni.csv
+```sh
+npm test
+npm run build
+npm run test:integration
 ```
 
-## Security Notes
+The integration test uses your development PostgreSQL connection and a separate temporary schema. It mocks outbound email, starts a server on port 3011, and verifies registration, verification, account approval, private pages/APIs, favorites across server restart, profile reviews, revocation, and password recovery. It never modifies the real roster or sends email.
 
-- `/admin` is protected and restricted to `ADMIN` users
-- Public routes never expose private `adminNotes`
-- All write APIs validate payloads with Zod schemas
-- Newsletter send respects `Alumni.unsubscribed = true`
-- No private LinkedIn scraping is performed; only submitted/imported data is used
+## Deploy
 
-## Deployment (Vercel + Neon/Supabase)
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel, managed PostgreSQL, email setup, migrations, and owner setup. `vercel.json` runs migrations before the build. Hosting and provider accounts must be connected before the site can be published.
 
-1. Create a managed Postgres DB (Neon or Supabase)
-2. Add all env vars in Vercel project settings
-3. Deploy the repo to Vercel
-4. Run database migrations:
+The My profile editor is preserved in `src/features/member-profile`, outside the active routes. It is not included in the deployed site; `/update` returns 404.
 
-```bash
-npx prisma migrate deploy
-```
-
-5. (Optional) run seed job once:
-
-```bash
-npm run db:seed
-```
-
-## Production Checklist
-
-- Set `AUTH_URL` to your production domain
-- Set secure `AUTH_SECRET`
-- Configure real `ADMIN_PASSWORD`
-- Configure a verified sender for Resend/SendGrid
-- Validate `DIRECTORY_ACCESS` policy for your chapter
+Existing event/newsletter database tables are retained to preserve historical data. Their pages and APIs remain removed.

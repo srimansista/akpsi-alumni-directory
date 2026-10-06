@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isApproved } from "@/lib/access";
 import { alumniSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
   const sort = searchParams.get("sort") ?? "name-asc";
 
   const session = await auth();
+  if (!isApproved(session)) return NextResponse.json({error:"Unauthorized"},{status:401});
   const isAdmin = session?.user?.role === "ADMIN";
 
   try {
@@ -88,7 +90,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

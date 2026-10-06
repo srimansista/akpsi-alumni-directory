@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isApproved } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,7 +35,7 @@ function parseYear(val: unknown): number | null {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || session.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

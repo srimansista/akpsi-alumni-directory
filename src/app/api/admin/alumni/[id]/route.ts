@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isApproved } from "@/lib/access";
 import { alumniSchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ type Params = { params: { id: string } };
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session || session.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -31,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const alumni = await prisma.alumni.update({
       where: { id: params.id },
-      data: parsed.data,
+      data: { ...parsed.data, ...(parsed.data.company !== undefined && parsed.data.company !== existing.company ? { employmentVerifiedAt: null } : {}) },
     });
     return NextResponse.json(alumni);
   } catch (err) {
@@ -42,7 +43,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session || session.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

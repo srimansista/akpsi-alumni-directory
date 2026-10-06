@@ -18,12 +18,32 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  passwordHash  String?
+  sessionVersion Int @default(0)
+  accessStatus  AccessStatus @default(PENDING)
+  approvedAt    DateTime?
+  approvedBy    String?
+  alumniId      String? @unique
+  alumni        Alumni? @relation(fields: [alumniId], references: [id], onDelete: SetNull)
   role          Role      @default(VIEWER)
   accounts      Account[]
   sessions      Session[]
   favorites     Favorite[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+enum AccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AuthAttempt {
+  key String @id
+  count Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
 }
 
 model Account {
@@ -61,6 +81,8 @@ model VerificationToken {
 }
 
 model Alumni {
+  pastCompanies    String[]  @default([])
+  employmentVerifiedAt DateTime?
   id               String    @id @default(cuid())
   name             String
   gradYear         Int?
@@ -78,6 +100,7 @@ model Alumni {
   unsubscribed     Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  member           User?
   favorites        Favorite[]
   eventRSVPs       EventRSVP[]
   newsletterRecipients NewsletterRecipient[]
@@ -177,10 +200,17 @@ model NewsletterRecipient {
   @@unique([newsletterId, email])
 }
 
+enum ConnectionStatus {
+  WANT_TO_TALK
+  TALKED_TO
+}
+
 model Favorite {
   id        String   @id @default(cuid())
   userId    String
   alumniId  String
+  status    ConnectionStatus @default(WANT_TO_TALK)
+  updatedAt DateTime @default(now()) @updatedAt
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   alumni    Alumni   @relation(fields: [alumniId], references: [id], onDelete: Cascade)

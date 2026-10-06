@@ -14,7 +14,7 @@ export default defineConfig({
     // Allow installs/builds (e.g. Vercel) to run prisma generate
     // before DATABASE_URL is configured in project settings.
     url:
-      process.env.DATABASE_URL ??
+      process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL ||
       "postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public",
   },
 });

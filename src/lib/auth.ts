@@ -1,93 +1,51 @@
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/password.mjs";
+import { consumeAttempt } from "@/lib/rate-limit";
 import { z } from "zod";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID ?? "",
-      clientSecret: process.env.AUTH_GOOGLE_SECRET ?? "",
-    }),
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const parsed = z
-          .object({ email: z.string().email(), password: z.string().min(1) })
-          .safeParse(credentials);
-        if (!parsed.success) return null;
-
-        const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD ?? "akpsi-admin-2024";
-
-        if (
-          parsed.data.email === adminEmail &&
-          parsed.data.password === adminPassword
-        ) {
-          let user = await prisma.user.findUnique({
-            where: { email: parsed.data.email },
-          });
-          if (!user) {
-            user = await prisma.user.create({
-              data: {
-                email: parsed.data.email,
-                name: "Admin",
-                role: "ADMIN",
-              },
-            });
-          }
-          return user;
-        }
-        return null;
-      },
-    }),
-  ],
-  callbacks: {
-    async session({ session, user, token }) {
-      if (session.user) {
-        if (user) {
-          session.user.id = user.id;
-          const dbUser = await prisma.user.findUnique({
-            where: { id: user.id },
-          });
-          session.user.role = dbUser?.role ?? "VIEWER";
-        } else if (token) {
-          session.user.id = token.sub ?? "";
-          session.user.role = (token.role as string) ?? "VIEWER";
-        }
-      }
-      return session;
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = (user as { role?: string }).role ?? "VIEWER";
-      }
-      return token;
-    },
-    async signIn({ user }) {
-      if (user?.email) {
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (user.email === adminEmail) {
-          await prisma.user.updateMany({
-            where: { email: user.email },
-            data: { role: "ADMIN" },
-          });
-        }
-      }
-      return true;
-    },
+ adapter: PrismaAdapter(prisma),
+ providers: [
+  Credentials({credentials:{email:{type:"email"},password:{type:"password"}},async authorize(credentials) {
+   const parsed = z.object({email:z.string().trim().toLowerCase().email(),password:z.string().min(1).max(128)}).safeParse(credentials);
+   if (!parsed.success) return null;
+   if (!await consumeAttempt("signin", parsed.data.email)) return null;
+   const user = await prisma.user.findUnique({where:{email:parsed.data.email}});
+   if (!user || user.accessStatus !== "APPROVED" || !user.emailVerified || !await verifyPassword(parsed.data.password,user.passwordHash)) return null;
+   return user;
+  }}),
+ ],
+ callbacks: {
+  async signIn({user}) {
+   if(!user.email) return false;
+   const member = await prisma.user.findUnique({where:{email:user.email.trim().toLowerCase()}});
+   return member?.accessStatus === "APPROVED" && !!member.emailVerified;
   },
-  pages: {
-    signIn: "/auth/signin",
+  async jwt({token,user}) {
+   if(user) {
+    token.sub = user.id;
+    const member = await prisma.user.findUnique({where:{id:user.id},select:{sessionVersion:true}});
+    token.sessionVersion = member?.sessionVersion;
+   }
+   return token;
   },
-  session: {
-    strategy: "jwt",
+  async session({session,token}) {
+   // Re-read approval and role on every request so revocation takes effect immediately.
+   const user = token.sub ? await prisma.user.findUnique({where:{id:token.sub},select:{id:true,name:true,email:true,role:true,accessStatus:true,alumniId:true,sessionVersion:true}}) : null;
+   if(session.user) {
+    session.user.id = user?.accessStatus === "APPROVED" && token.sessionVersion === user.sessionVersion ? user.id : "";
+    session.user.role = user?.role ?? "VIEWER";
+    session.user.accessStatus = user?.accessStatus ?? "REJECTED";
+    session.user.alumniId = user?.alumniId ?? null;
+    session.user.name = user?.name ?? null;
+    session.user.email = user?.email ?? "";
+   }
+   return session;
   },
+ },
+ pages:{signIn:"/auth/signin",error:"/auth/signin"},
+ session:{strategy:"jwt",maxAge:7*24*60*60},
 });

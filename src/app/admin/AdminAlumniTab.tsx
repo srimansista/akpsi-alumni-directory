@@ -37,6 +37,7 @@ interface Alumni {
   email: string | null;
   gradYear: number | null;
   company: string | null;
+  pastCompanies?: string[];
   linkedInUrl?: string | null;
   role: string | null;
   location: string | null;
@@ -209,6 +210,7 @@ export default function AdminAlumniTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          pastCompanies: (form.pastCompanies ?? []).map(c => c.trim()).filter(Boolean),
           gradYear: form.gradYear ? Number(form.gradYear) : null,
         }),
       });
@@ -231,6 +233,7 @@ export default function AdminAlumniTab() {
       email: a.email ?? "",
       gradYear: a.gradYear ?? "",
       company: a.company ?? "",
+      pastCompanies: (a.pastCompanies ?? []).join("; "),
       role: a.role ?? "",
       location: a.location ?? "",
       industry: a.industry ?? "",
@@ -428,6 +431,10 @@ export default function AdminAlumniTab() {
               <div className="space-y-1">
                 <Label>Company</Label>
                 <Input value={form.company ?? ""} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Past companies (separate with semicolons)</Label>
+                <Input value={(form.pastCompanies ?? []).join(";")} onChange={(e) => setForm((f) => ({ ...f, pastCompanies: e.target.value.split(";") }))} />
               </div>
               <div className="space-y-1">
                 <Label>Grad Year</Label>

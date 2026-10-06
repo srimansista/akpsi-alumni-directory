@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isApproved } from "@/lib/access";
 import { alumniSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -13,6 +14,8 @@ export async function GET(
   _req: NextRequest,
   { params }: Params
 ) {
+  const session = await auth();
+  if (!isApproved(session)) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const alumnus = await prisma.alumni.findUnique({
       where: { id: params.id },
@@ -22,7 +25,8 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json(alumnus);
+    const publicRecord = { ...alumnus, adminNotes: undefined };
+    return NextResponse.json(session?.user.role === "ADMIN" ? alumnus : publicRecord);
   } catch (err) {
     console.error("[GET /api/alumni/[id]]", err);
     return NextResponse.json(
@@ -37,7 +41,7 @@ export async function PUT(
   { params }: Params
 ) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -82,7 +86,7 @@ export async function DELETE(
   { params }: Params
 ) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (!isApproved(session) || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

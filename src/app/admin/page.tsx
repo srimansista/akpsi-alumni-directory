@@ -2,36 +2,30 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { requireMember } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, CalendarDays, Newspaper } from "lucide-react";
+import { Shield, Users, FileText } from "lucide-react";
 import AdminAlumniTab from "./AdminAlumniTab";
-import AdminEventsTab from "./AdminEventsTab";
-import AdminNewsletterTab from "./AdminNewsletterTab";
+import AdminMembersTab from "./AdminMembersTab";
 import AdminSubmissionsTab from "./AdminSubmissionsTab";
 
 async function getAdminStats() {
   try {
-    const now = new Date();
-    const [totalAlumni, pendingSubmissions, upcomingEvents, newslettersSent] =
+    const [totalAlumni, pendingSubmissions] =
       await Promise.all([
         prisma.alumni.count(),
         prisma.alumniUpdateSubmission.count({ where: { status: "PENDING" } }),
-        prisma.event.count({
-          where: { isPublished: true, date: { gte: now } },
-        }),
-        prisma.newsletter.count({ where: { isDraft: false } }),
       ]);
-    return { totalAlumni, pendingSubmissions, upcomingEvents, newslettersSent };
+    return { totalAlumni, pendingSubmissions };
   } catch {
-    return { totalAlumni: 0, pendingSubmissions: 0, upcomingEvents: 0, newslettersSent: 0 };
+    return { totalAlumni: 0, pendingSubmissions: 0 };
   }
 }
 
-export default async function AdminPage() {
-  const session = await auth();
+export default async function AdminPage({ searchParams }: { searchParams: { tab?: string } }) {
+  const session = await requireMember();
   if (!session || session.user?.role !== "ADMIN") {
     redirect("/");
   }
@@ -39,10 +33,10 @@ export default async function AdminPage() {
   const stats = await getAdminStats();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="workspace-page admin-page">
       {/* Header */}
-      <div className="bg-[#1e3a5f] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="admin-page-heading">
+        <div className="admin-content py-8">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="w-6 h-6 text-[#c9a84c]" />
             <span className="text-[#c9a84c] text-sm font-semibold uppercase tracking-widest">
@@ -50,14 +44,14 @@ export default async function AdminPage() {
             </span>
           </div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-gray-300 mt-1 text-sm">
+          <p className="text-slate-500 mt-1 text-sm">
             Signed in as {session.user?.email}
           </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="overview">
+      <div className="admin-content py-8">
+        <Tabs defaultValue={searchParams.tab === "submissions" ? "submissions" : searchParams.tab === "members" ? "members" : "overview"}>
           <TabsList className="mb-8 bg-white border border-gray-200 shadow-sm">
             <TabsTrigger value="overview" className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" /> Overview
@@ -68,17 +62,12 @@ export default async function AdminPage() {
             <TabsTrigger value="submissions" className="flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" /> Submissions
             </TabsTrigger>
-            <TabsTrigger value="events" className="flex items-center gap-1.5">
-              <CalendarDays className="w-3.5 h-3.5" /> Events
-            </TabsTrigger>
-            <TabsTrigger value="newsletter" className="flex items-center gap-1.5">
-              <Newspaper className="w-3.5 h-3.5" /> Newsletter
-            </TabsTrigger>
+            <TabsTrigger value="members">Member access</TabsTrigger>
           </TabsList>
 
           {/* ── Overview ── */}
           <TabsContent value="overview">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
               {[
                 {
                   icon: Users,
@@ -93,20 +82,6 @@ export default async function AdminPage() {
                   value: stats.pendingSubmissions.toString(),
                   color: "text-amber-600",
                   bg: "bg-amber-50",
-                },
-                {
-                  icon: CalendarDays,
-                  label: "Upcoming Events",
-                  value: stats.upcomingEvents.toString(),
-                  color: "text-[#c9a84c]",
-                  bg: "bg-[#c9a84c]/10",
-                },
-                {
-                  icon: Newspaper,
-                  label: "Newsletters Sent",
-                  value: stats.newslettersSent.toString(),
-                  color: "text-emerald-600",
-                  bg: "bg-emerald-50",
                 },
               ].map(({ icon: Icon, label, value, color, bg }) => (
                 <Card key={label} className="shadow-sm">
@@ -125,12 +100,9 @@ export default async function AdminPage() {
               <CardHeader>
                 <CardTitle className="text-[#1e3a5f] text-base">Quick Links</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
                   { label: "View Alumni Directory", href: "/directory" },
-                  { label: "View Events", href: "/events" },
-                  { label: "View Newsletter Archive", href: "/newsletter" },
-                  { label: "Submit Alumni Update", href: "/update" },
                 ].map(({ label, href }) => (
                   <a
                     key={href}
@@ -144,6 +116,7 @@ export default async function AdminPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="members"><AdminMembersTab/></TabsContent>
           {/* ── Alumni ── */}
           <TabsContent value="alumni">
             <AdminAlumniTab />
@@ -154,15 +127,7 @@ export default async function AdminPage() {
             <AdminSubmissionsTab />
           </TabsContent>
 
-          {/* ── Events ── */}
-          <TabsContent value="events">
-            <AdminEventsTab />
-          </TabsContent>
 
-          {/* ── Newsletter ── */}
-          <TabsContent value="newsletter">
-            <AdminNewsletterTab />
-          </TabsContent>
         </Tabs>
       </div>
     </div>
