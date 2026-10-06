@@ -1,6 +1,6 @@
 # Hosting the chapter portal
 
-The Vercel project is `akpsiot/akpsi-alumni-directory`, linked to `srimansista/akpsi-alumni-directory` on GitHub. The production address is `https://akpsi-alumni-directory-three.vercel.app`. Node.js is pinned to 22.x in the project settings.
+The Vercel project is `akpsiot/akpsi-alumni-directory`, linked to `srimansista/akpsi-alumni-directory` on GitHub. The production address is `https://akpsi-ot-alumni.vercel.app`. Node.js is pinned to 22.x in the project settings.
 
 Neon resources `akpsi-production` and `akpsi-preview` use separate databases, environment targets, and authentication secrets. The current roster was imported into each from the local PostgreSQL database using `node scripts/prepare-hosted.mjs .env.production.local` (or `.env.preview.local`). The import preserves verified employment and past-company information and never overwrites an existing row.
 
