@@ -48,10 +48,18 @@ try {
  const member=await db.user.findUnique({where:{email:memberEmail}});
  assert.equal(member.accessStatus,'PENDING');assert.notEqual(member.passwordHash,password);
  assert.equal(member.emailVerified,null,'registration does not pretend to verify email');
+ assert.equal(member.alumniId,null,'registration does not link accounts to the directory');
+ const rosterBeforeApproval=await db.alumni.count();
  assert.equal(existsSync(outbox),false,'registration sends no email');
  assert.equal((await client().login(member.email,password))?.user,undefined,'pending cannot log in');
  const adminClient=client();assert.equal((await adminClient.login(admin.email,password)).user.role,'ADMIN');
  assert.equal((await adminClient.request(`/api/admin/members/${member.id}`,json({accessStatus:'APPROVED'},'PATCH'))).status,200);
+ assert.equal(await db.alumni.count(),rosterBeforeApproval,'approval does not create alumni');
+ assert.equal((await db.user.findUnique({where:{id:member.id}})).alumniId,null,'matching email does not auto-link an active brother');
+ const active=await db.user.create({data:{name:'Active Brother',email:'active@example.test',passwordHash}});
+ assert.equal((await adminClient.request(`/api/admin/members/${active.id}`,json({accessStatus:'APPROVED'},'PATCH'))).status,200);
+ assert.equal(await db.alumni.count(),rosterBeforeApproval,'approving an account absent from the directory creates no alumni');
+ assert.equal((await client().login(active.email,password)).user.id,active.id,'active brothers can sign in without an alumni record');
  const memberClient=client();const loggedIn=await memberClient.login(member.email,password);assert.equal(loggedIn.user.id,member.id);
  assert.equal(JSON.stringify(loggedIn).includes(passwordHash),false,'password hash never appears in session');
  console.log('PASS: registration needs no email service; explicit admin approval enables login');
@@ -84,6 +92,8 @@ try {
  assert.equal((await memberClient.request(`/api/connections/${record.id}`,json({status:'WANT_TO_TALK'},'PATCH'))).status,200);
  console.log('PASS: saved contact statuses are private, validated, removable, and persistent');
  console.log('PASS: profile data and favorites are private and survive server restart');
+ // An alumni owner can be linked explicitly; ordinary account approval never creates or links directory records.
+ await db.user.update({where:{id:member.id},data:{alumniId:record.id}});
  const submitted=await memberClient.request('/api/submissions',json({name:'Integration Brother',company:'Updated Company',email:member.email,alumniId:'forged-target'}));assert.equal(submitted.status,201);const submission=await submitted.json();
  assert.equal((await db.alumniUpdateSubmission.findUnique({where:{id:submission.id}})).alumniId,record.id,'submission ownership comes from session');
  assert.equal((await db.alumni.findUnique({where:{id:record.id}})).company,'Original Company','pending changes not published');

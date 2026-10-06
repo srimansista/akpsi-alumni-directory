@@ -15,13 +15,7 @@ export async function PATCH(req: NextRequest,{params}:{params:{id:string}}) {
    const user = await tx.user.findUnique({where:{id:params.id}});
    if(!user) throw new Error("NOT_FOUND");
    if(user.role === "ADMIN") throw new Error("ADMIN_ACCOUNT");
-   let alumniId = user.alumniId;
-   if(parsed.data.accessStatus === "APPROVED" && !alumniId) {
-    const record = await tx.alumni.findFirst({where:{email:{equals:user.email,mode:"insensitive"}}});
-    const alumnus = record ?? await tx.alumni.create({data:{name:user.name ?? "Member",email:user.email}});
-    alumniId = alumnus.id;
-   }
-   const updated = await tx.user.update({where:{id:user.id},data:{accessStatus:parsed.data.accessStatus,approvedAt:parsed.data.accessStatus === "APPROVED" ? new Date() : null,approvedBy:session.user.id,alumniId,sessionVersion:{increment:1}},select:{id:true,accessStatus:true}});
+   const updated = await tx.user.update({where:{id:user.id},data:{accessStatus:parsed.data.accessStatus,approvedAt:parsed.data.accessStatus === "APPROVED" ? new Date() : null,approvedBy:session.user.id,sessionVersion:{increment:1}},select:{id:true,accessStatus:true}});
    await tx.auditLog.create({data:{action:parsed.data.accessStatus,entity:"User",entityId:user.id,userId:session.user.id}});
    return updated;
   });

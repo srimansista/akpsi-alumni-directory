@@ -45,7 +45,7 @@ Only mark the initial migration as applied when the existing tables match it. Do
 
 ## Owner workflow
 
-Sign in → Administration → Member access. Approve known brothers or reject requests. Approval enables sign-in without email verification. Revoking access invalidates old login cookies immediately. Existing profile changes remain in the separate Submissions queue; approving a profile update does not grant login access. The My profile editor is archived outside the active routes and is not deployed.
+Sign in → Administration → Member access. Approve known brothers or reject requests. Approval enables sign-in without email verification. Login accounts are independent of the alumni roster; registration and approval never create or automatically link alumni records. Revoking access invalidates old login cookies immediately. Existing profile changes remain in the separate Submissions queue; approving a profile update does not grant login access. The My profile editor is archived outside the active routes and is not deployed.
 
 ## Validation before inviting members
 
