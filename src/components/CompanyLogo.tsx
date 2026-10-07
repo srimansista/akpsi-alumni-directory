@@ -13,7 +13,7 @@ export function CompanyLogo({ company }: { company: string }) {
   const src = normalizedLogos[companyKey(company)];
   const initials = company.replace(/[^a-zA-Z0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
   return (
-    <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-500">
+    <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 text-xs font-bold text-slate-500 ${src === "/company-logos/riveron-com.png" && failedSrc !== src ? "bg-slate-900" : "bg-white"}`}>
       {src && failedSrc !== src ? (
         <Image src={src} alt="" width={28} height={28} unoptimized key={src} onError={() => setFailedSrc(src)} className="h-7 w-7 object-contain" />
       ) : initials || "—"}
